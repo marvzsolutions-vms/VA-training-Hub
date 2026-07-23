@@ -125,11 +125,12 @@ export default function CourseDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          {enrollment && (
+          {access.allowed && (
             <Card className="mb-6">
-              <ProgressBar value={Number(enrollment.progress)} label="Your progress" />
+              <ProgressBar value={enrollment ? Number(enrollment.progress) : 0} label="Your progress" />
               <p className="mt-2 text-xs text-ink-soft">
                 {completedIds.size} of {requiredCount} required lessons complete
+                {!enrollment && !course.specialization_id && ' · Unlocked automatically by your current level'}
               </p>
             </Card>
           )}

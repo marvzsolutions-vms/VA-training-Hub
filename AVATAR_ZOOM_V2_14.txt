@@ -1,0 +1,6 @@
+VA Success Academy V2.14 — Avatar Zoom Fix
+
+- Cropped transparent padding from all four built-in avatar assets.
+- Enlarged avatar display from 128px to 160px in profile selection cards.
+- Increased upload card height to keep the avatar grid aligned.
+- No Supabase SQL changes required.

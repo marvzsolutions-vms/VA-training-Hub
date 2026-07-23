@@ -1,0 +1,7 @@
+VA Success Academy V2.13 Avatar Refresh
+
+- Replaced the built-in avatar artwork with a cleaner professional chibi set.
+- Coach accounts: one female and one male standard avatar.
+- Student accounts: one girl and one boy standard avatar.
+- Custom photo upload remains available.
+- No new Supabase migration is required because existing avatar_choice values are reused.

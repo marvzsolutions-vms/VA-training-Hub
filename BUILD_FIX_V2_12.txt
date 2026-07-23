@@ -1,0 +1,8 @@
+VA Success Academy V2.12
+
+Fixes:
+- Students can securely load active coaches in the private-question selector.
+- Coach directory exposes only id, display name, email, and avatar.
+- Coach query errors are now surfaced instead of silently appearing as an empty list.
+
+Required: run RUN_THIS_IN_SUPABASE_SQL_EDITOR.sql before testing.

@@ -158,12 +158,7 @@ export default function AccessPage() {
     if (!profile || bulkIds.length === 0) return
     setSaving(true)
     try {
-      const { error: gErr } = await supabase.from('student_access').insert(
-        bulkIds.map((id) => ({
-          student_id: id, level: bulkLevel, status: 'approved' as AccessStatus,
-          granted_by: profile.id, notes: bulkNote,
-        })))
-      if (gErr) throw gErr
+      // current_level is the source of truth; do not create duplicate level grants.
       const { error: pErr } = await supabase.from('student_profiles').update({
         current_level: bulkLevel, access_status: 'active',
         upgraded_at: new Date().toISOString(), upgrade_approved_by: profile.id,
@@ -186,21 +181,26 @@ export default function AccessPage() {
     if (!form.student_id || !profile) return
     setSaving(true)
     try {
-      const { error } = await supabase.from('student_access').insert({
-        student_id: form.student_id,
-        level: form.course_id ? null : form.level,
-        course_id: form.course_id || null,
-        status: form.status,
-        granted_by: profile.id,
-        expires_at: form.expires_at ? new Date(form.expires_at).toISOString() : null,
-        notes: form.notes,
-      })
-      if (error) throw error
-
-      if (!form.course_id && (form.status === 'approved' || form.status === 'active')) {
-        await supabase.from('student_profiles')
-          .update({ current_level: form.level, access_status: form.status })
-          .eq('user_id', form.student_id)
+      if (form.course_id) {
+        const { error } = await supabase.from('student_access').insert({
+          student_id: form.student_id,
+          level: null,
+          course_id: form.course_id,
+          status: form.status,
+          granted_by: profile.id,
+          expires_at: form.expires_at ? new Date(form.expires_at).toISOString() : null,
+          notes: form.notes,
+        })
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('student_profiles').update({
+          current_level: form.level,
+          access_status: form.status,
+          upgraded_at: new Date().toISOString(),
+          upgrade_approved_by: profile.id,
+          upgrade_notes: form.notes,
+        }).eq('user_id', form.student_id)
+        if (error) throw error
       }
 
       await supabase.from('notifications').insert({
@@ -228,7 +228,7 @@ export default function AccessPage() {
     <>
       <PageHeader
         title="Access control"
-        description="Every level and course grant in one place. Changes take effect immediately."
+        description="Student levels come from the profile. Explicit grants are only for course exceptions and temporary access."
         action={
           <>
             <Button variant="outline" onClick={() => setBulkOpen(true)}>

@@ -87,17 +87,6 @@ export default function StudentDetailPage() {
     if (!studentId || !me) return
     setSaving(true)
     try {
-      const expires = form.expires_at ? new Date(form.expires_at).toISOString() : null
-      const { error: grantError } = await supabase.from('student_access').insert({
-        student_id: studentId,
-        level: form.level,
-        status: form.status,
-        granted_by: me.id,
-        expires_at: expires,
-        notes: form.notes,
-      })
-      if (grantError) throw grantError
-
       const previous = state.data?.student.current_level ?? null
       const { error: profileError } = await supabase.from('student_profiles').update({
         current_level: form.level,
@@ -219,10 +208,10 @@ export default function StudentDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div>
-          <SectionHeading title="Enrolled courses" />
+          <SectionHeading title="Course progress records" description="Standard courses unlock automatically by level; rows appear here once progress is recorded or a course is explicitly assigned." />
           <Card className="divide-y divide-canvas-line p-0">
             {enrollments.length === 0 ? (
-              <p className="px-4 py-6 text-sm text-ink-muted">Not enrolled in any course yet.</p>
+              <p className="px-4 py-6 text-sm text-ink-muted">No course progress records yet. Level-based course access does not require manual enrollment.</p>
             ) : enrollments.map((enrollment) => (
               <div key={enrollment.id} className="px-4 py-3">
                 <div className="flex items-center justify-between gap-3">

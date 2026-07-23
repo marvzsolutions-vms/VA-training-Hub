@@ -1,0 +1,25 @@
+VA Success Academy V2.17 — Access Engine Refactor
+
+Replacement files:
+- src/lib/access.ts
+- src/pages/UpgradeRequestsPage.tsx
+- src/pages/staff/AccessPage.tsx
+- src/pages/staff/StudentDetailPage.tsx
+- src/pages/CourseDetailPage.tsx
+- supabase/migrations/0011_level_access_engine_fix.sql
+
+Behavior:
+- student_profiles.current_level is the permanent level source of truth.
+- Level 2 cumulatively unlocks standard Level 1 and Level 2 courses.
+- Level 3 cumulatively unlocks standard Level 1, Level 2, and Level 3 courses.
+- Standard courses no longer require manual course_enrollments rows.
+- Required prerequisites are still enforced.
+- Specialized courses retain explicit specialization/course assignment rules.
+- Approval screens no longer create permanent level-grant rows.
+- Migration removes duplicate legacy level grants and adds a partial unique index.
+
+Build verification:
+- npm run build was attempted.
+- The uploaded ZIP did not include node_modules.
+- npm dependency installation could not complete in the execution environment because package downloads repeatedly timed out.
+- No application compile error was reached after the refactor; build verification must be rerun locally with `npm ci && npm run build`.

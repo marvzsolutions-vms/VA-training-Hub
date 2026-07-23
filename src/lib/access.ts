@@ -61,54 +61,39 @@ export function evaluateCourseAccess(course: Course, ctx: AccessContext): Access
     }
   }
 
-  const enrollment = ctx.enrollments.find((e) => e.course_id === course.id)
-  if (!enrollment) {
-    return {
-      allowed: false,
-      reason: 'You are not enrolled in this course yet.',
-      action: 'Ask your Manager to enrol you.',
+  // Standard courses are unlocked cumulatively from student_profiles.current_level.
+  // They do not require a manual course_enrollments row or a separate level grant.
+  if (!course.specialization_id) {
+    if (LEVEL_RANK[course.level] > LEVEL_RANK[student.current_level]) {
+      return {
+        allowed: false,
+        reason: `This course is ${LEVEL_SHORT[course.level]}. You are on ${LEVEL_SHORT[student.current_level]}.`,
+        action: course.level === 'level_3'
+          ? 'Level 3 is unlocked by a Manager or Owner.'
+          : 'Finish your current level, then request an upgrade.',
+      }
     }
-  }
-  if (!['active', 'approved', 'temporarily_active', 'completed'].includes(enrollment.status)) {
-    return {
-      allowed: false,
-      reason: `Your enrolment is ${enrollment.status.replace('_', ' ')}.`,
-      action: 'Contact your Manager.',
-    }
-  }
-  if (enrollment.expires_at && new Date(enrollment.expires_at) <= new Date()) {
-    return {
-      allowed: false,
-      reason: 'Your temporary access to this course has expired.',
-      action: 'Request an extension from your Manager.',
-    }
-  }
+  } else {
+    // Specialized courses continue to use their explicit specialization/course access rules.
+    const courseGranted = activeGrant(ctx.grants, (g) => g.course_id === course.id)
+    const enrollment = ctx.enrollments.find((e) => e.course_id === course.id)
+    const activeEnrollment = !!enrollment &&
+      ['active', 'approved', 'temporarily_active', 'completed'].includes(enrollment.status) &&
+      (!enrollment.expires_at || new Date(enrollment.expires_at) > new Date())
 
-  const levelGranted = activeGrant(ctx.grants, (g) => g.level === course.level)
-  if (LEVEL_RANK[course.level] > LEVEL_RANK[student.current_level] && !levelGranted) {
-    return {
-      allowed: false,
-      reason: `This course is ${LEVEL_SHORT[course.level]}. You are on ${LEVEL_SHORT[student.current_level]}.`,
-      action: course.level === 'level_3'
-        ? 'Level 3 is unlocked by a Manager or Owner.'
-        : 'Finish your current level, then request an upgrade.',
+    if (!ctx.specializationIds.includes(course.specialization_id)) {
+      return {
+        allowed: false,
+        reason: 'This course belongs to a specialization you have not selected.',
+        action: 'Ask your Manager to add this specialization.',
+      }
     }
-  }
-
-  const courseGranted = activeGrant(ctx.grants, (g) => g.course_id === course.id)
-  if (course.upgrade_required && !courseGranted && !levelGranted) {
-    return {
-      allowed: false,
-      reason: 'This course needs an approved upgrade.',
-      action: 'Request access from your Manager.',
-    }
-  }
-
-  if (course.specialization_id && !ctx.specializationIds.includes(course.specialization_id)) {
-    return {
-      allowed: false,
-      reason: 'This course belongs to a specialization you have not selected.',
-      action: 'Ask your Manager to add this specialization.',
+    if (!activeEnrollment && !courseGranted) {
+      return {
+        allowed: false,
+        reason: 'This specialization course has not been assigned to you yet.',
+        action: 'Ask your Manager to grant course access.',
+      }
     }
   }
 

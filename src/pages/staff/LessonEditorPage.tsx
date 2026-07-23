@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Plus, Presentation, Trash2 } from 'lucide-react'
+import { Plus, Presentation, Trash2, Upload, Video } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAsyncData } from '../../lib/useAsyncData'
 import { useToast } from '../../context/ToastContext'
@@ -9,6 +9,7 @@ import {
   SectionHeading, Select, Spinner, Textarea,
 } from '../../components/ui'
 import { LESSON_TYPE_LABEL, readableError } from '../../lib/utils'
+import { uploadAcademyMedia } from '../../lib/media'
 import type { Lesson, LessonScreenshot, LessonSection, LessonType } from '../../lib/types'
 
 const EMPTY_SECTION = {
@@ -27,6 +28,7 @@ export default function LessonEditorPage() {
   const { notify } = useToast()
   const [draft, setDraft] = useState<Lesson | null>(null)
   const [saving, setSaving] = useState(false)
+  const [uploadingVideo, setUploadingVideo] = useState(false)
   const [sectionForm, setSectionForm] = useState<typeof EMPTY_SECTION | null>(null)
   const [shotForm, setShotForm] = useState<typeof EMPTY_SHOT | null>(null)
   const [removing, setRemoving] = useState<{ table: 'lesson_sections' | 'lesson_screenshots'; id: string } | null>(null)
@@ -217,10 +219,34 @@ export default function LessonEditorPage() {
               </Select>
               <Input label="Estimated minutes" type="number" min={1} value={draft.estimated_minutes}
                 onChange={(e) => setDraft({ ...draft, estimated_minutes: Number(e.target.value) })} />
-              <div className="sm:col-span-2">
-                <Input label="Recording link" type="url" value={draft.recording_url ?? ''}
+              <div className="sm:col-span-2 space-y-3">
+                <Input
+                  label={['video', 'recorded_zoom', 'tutorial'].includes(draft.type) ? 'Video link or embed URL' : 'Lesson action link'}
+                  type="url" value={draft.recording_url ?? ''}
                   onChange={(e) => setDraft({ ...draft, recording_url: e.target.value })}
-                  hint="Zoom or video link students can rewatch." />
+                  hint={['video', 'recorded_zoom', 'tutorial'].includes(draft.type)
+                    ? 'Paste a YouTube, Vimeo, Loom, Google Drive, or direct MP4 link. The video appears at the top of the lesson.'
+                    : 'Used for Zoom, downloads, or external lesson links depending on the lesson type.'} />
+                {['video', 'recorded_zoom', 'tutorial'].includes(draft.type) && (
+                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-brand-300 bg-brand-50 px-4 py-3 text-sm font-medium text-brand-700 hover:bg-brand-100">
+                    {uploadingVideo ? 'Uploading video...' : <><Upload className="h-4 w-4" aria-hidden />Upload MP4, WebM or MOV</>}
+                    <input type="file" accept="video/mp4,video/webm,video/quicktime,video/ogg" className="hidden" disabled={uploadingVideo}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        setUploadingVideo(true)
+                        try {
+                          const url = await uploadAcademyMedia(file, 'lesson-videos')
+                          setDraft({ ...draft, recording_url: url })
+                          notify('Video uploaded. Save the lesson to publish it.')
+                        } catch (error) { notify(readableError(error), 'error') }
+                        finally { setUploadingVideo(false); e.target.value = '' }
+                      }} />
+                  </label>
+                )}
+                {draft.recording_url && ['video', 'recorded_zoom', 'tutorial'].includes(draft.type) && (
+                  <p className="flex items-center gap-2 text-xs text-emerald-700"><Video className="h-4 w-4" aria-hidden />Video is attached and will appear at the top of the lesson.</p>
+                )}
               </div>
             </div>
           </Card>

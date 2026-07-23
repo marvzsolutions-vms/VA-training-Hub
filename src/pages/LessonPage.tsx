@@ -16,6 +16,7 @@ import {
 import { formatDate, formatDuration, LESSON_TYPE_LABEL, readableError } from '../lib/utils'
 import { blockIcons, buildTeachingBlocks, detectTopic } from '../lib/lessonExperience'
 import TopicVisual from '../components/TopicVisual'
+import LessonMedia from '../components/LessonMedia'
 import type {
   Course, Lesson, LessonProgress, LessonScreenshot, LessonSection, ResourceItem, Tool,
 } from '../lib/types'
@@ -184,6 +185,28 @@ export default function LessonPage() {
         <TopicVisual topic={topic} />
       </section>
 
+      {lesson.recording_url && ['video', 'recorded_zoom', 'tutorial'].includes(lesson.type) && (
+        <section className="mb-6">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">Lesson video</p>
+              <h2 className="mt-1 text-lg font-semibold text-ink">{lesson.title}</h2>
+            </div>
+            <Badge tone="brand">{LESSON_TYPE_LABEL[lesson.type]}</Badge>
+          </div>
+          <LessonMedia url={lesson.recording_url} title={lesson.title} />
+        </section>
+      )}
+
+      {lesson.recording_url && lesson.type === 'live_zoom' && (
+        <Card className="mb-6 border-brand-200 bg-brand-50/60">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div><p className="text-xs font-semibold uppercase tracking-wide text-brand-700">Live Zoom lesson</p><h2 className="mt-1 text-lg font-semibold text-ink">Join the live session</h2></div>
+            <ExternalLink href={lesson.recording_url}><Button><Video className="h-4 w-4" aria-hidden />Join Zoom</Button></ExternalLink>
+          </div>
+        </Card>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
           <div className="flex flex-wrap items-center gap-2">
@@ -344,13 +367,13 @@ export default function LessonPage() {
         </div>
 
         <aside className="space-y-6">
-          {lesson.recording_url && (
+          {lesson.recording_url && !['video', 'recorded_zoom', 'tutorial', 'live_zoom'].includes(lesson.type) && (
             <Card>
               <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
-                <Video className="h-4 w-4 text-brand-600" aria-hidden />Session recording
+                <Video className="h-4 w-4 text-brand-600" aria-hidden />Lesson link
               </h2>
               <ExternalLink href={lesson.recording_url} className="mt-3 block">
-                <Button variant="secondary" className="w-full">Watch the recording</Button>
+                <Button variant="secondary" className="w-full">Open lesson link</Button>
               </ExternalLink>
             </Card>
           )}

@@ -9,10 +9,11 @@ import {
 import { supabase } from '../lib/supabase'
 import { useAsyncData } from '../lib/useAsyncData'
 import { ErrorState, Spinner } from '../components/ui'
+import LessonMedia from '../components/LessonMedia'
 import type { Lesson, LessonScreenshot, LessonSection } from '../lib/types'
 
 type SlideKind = 'hero' | 'content' | 'cards' | 'timeline' | 'comparison' | 'checklist' |
-  'screenshot' | 'quote' | 'process' | 'activity' | 'coach' | 'summary'
+  'screenshot' | 'quote' | 'process' | 'activity' | 'coach' | 'summary' | 'video'
 
 interface SlideItem { title: string; text: string }
 interface Slide {
@@ -22,12 +23,13 @@ interface Slide {
   eyebrow: string
   items?: SlideItem[]
   screenshot?: LessonScreenshot
+  mediaUrl?: string
 }
 
 const labels: Record<SlideKind, string> = {
   hero: 'Lesson overview', content: 'Teaching', cards: 'Key ideas', timeline: 'Step by step',
   comparison: 'Compare', checklist: 'Checklist', screenshot: 'Walkthrough', quote: 'Key insight',
-  process: 'Process', activity: 'Live activity', coach: 'Coach only', summary: 'Takeaways',
+  process: 'Process', activity: 'Live activity', coach: 'Coach only', summary: 'Takeaways', video: 'Lesson video',
 }
 
 function cleanText(value = '') {
@@ -118,6 +120,10 @@ export default function PresentationPage() {
       kind: 'hero', eyebrow: data.courseTitle || 'VA Success Academy', title: data.lesson.title,
       body: cleanText(data.lesson.objective || data.lesson.description),
     }]
+
+    if (data.lesson.recording_url && ['video', 'recorded_zoom', 'tutorial'].includes(data.lesson.type)) {
+      built.push({ kind: 'video', eyebrow: 'Lesson video', title: data.lesson.title, body: '', mediaUrl: data.lesson.recording_url })
+    }
 
     const presentation = cleanText(data.lesson.presentation_content)
     if (presentation) {
@@ -333,6 +339,16 @@ export default function PresentationPage() {
 }
 
 function SlideRenderer({ slide, number, total }: { slide: Slide; number: number; total: number }) {
+  if (slide.kind === 'video' && slide.mediaUrl) return (
+    <section className="slide-shell slide-standard presentation-enter" key={`${number}-${slide.title}`}>
+      <SlideHeading slide={slide} />
+      <div className="mx-auto mt-6 w-full max-w-5xl">
+        <LessonMedia url={slide.mediaUrl} title={slide.title} compact />
+      </div>
+      <SlideCorner number={number} total={total} />
+    </section>
+  )
+
   if (slide.kind === 'hero') return (
     <section className="slide-shell slide-hero presentation-enter" key={`${number}-${slide.title}`}>
       <div className="slide-copy">

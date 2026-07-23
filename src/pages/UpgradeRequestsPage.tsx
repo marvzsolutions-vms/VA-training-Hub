@@ -182,15 +182,8 @@ export default function UpgradeRequestsPage() {
       if (error) throw error
       await logAction(current.id, action, current.status, to, note)
 
-      // Approval actually moves the student.
+      // Permanent level access comes only from student_profiles.current_level.
       if (to === 'approved' && current.requested_level) {
-        await supabase.from('student_access').insert({
-          student_id: current.student_id,
-          level: current.requested_level,
-          status: 'approved',
-          granted_by: profile.id,
-          notes: note || 'Approved from upgrade request.',
-        })
         await supabase.from('student_profiles').update({
           current_level: current.requested_level,
           access_status: 'active',

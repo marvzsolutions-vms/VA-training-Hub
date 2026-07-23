@@ -1,0 +1,8 @@
+VA Success Academy V2.15
+
+- Video, Recorded Zoom, and Tutorial lessons now display the attached video at the top of the lesson page.
+- Supports YouTube, Vimeo, Loom, Google Drive preview, and direct MP4/WebM/OGG/MOV URLs.
+- Lesson editor now accepts either a video URL or direct video upload to the academy-media Supabase bucket.
+- Presentation mode automatically adds a video slide immediately after the lesson title slide.
+- Live Zoom lessons show a Join Zoom action instead of a recording card.
+- Student login now always opens the dashboard instead of returning to a staff-only page from a previous session.

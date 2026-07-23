@@ -1,0 +1,14 @@
+VA Success Academy V2.11 Build Fix
+
+This package fixes the four build errors reported from V2.10:
+1. Removed unused PageHeader import from LessonPage.tsx.
+2. Removed unused AppRole import from NotificationsPage.tsx.
+3. Corrected the QuestionsPage Supabase select typing and relationship selection.
+4. Replaced String.replaceAll with a compatible global regular-expression replace.
+
+After extracting:
+1. npm install
+2. npm run dev
+3. npm run build
+
+No new Supabase SQL is required for this build-fix release.
