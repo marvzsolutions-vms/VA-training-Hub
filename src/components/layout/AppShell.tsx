@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Bell, LogOut, Menu, X } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
@@ -22,6 +22,7 @@ export default function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [unread, setUnread] = useState(0)
   const [openQuestions, setOpenQuestions] = useState(0)
+  const [openUpgradeRequests, setOpenUpgradeRequests] = useState(0)
 
   useEffect(() => { setMobileOpen(false) }, [location.pathname])
 
@@ -38,6 +39,25 @@ export default function AppShell() {
     supabase.rpc('get_question_badge_count')
       .then(({ data, error }) => setOpenQuestions(error ? 0 : Number(data ?? 0)))
   }, [profile, location.pathname])
+
+  const refreshUpgradeRequestBadge = useCallback(async () => {
+    if (!profile || profile.role === 'student') {
+      setOpenUpgradeRequests(0)
+      return
+    }
+    const { data, error } = await supabase.rpc('get_upgrade_request_badge_count')
+    setOpenUpgradeRequests(error ? 0 : Number(data ?? 0))
+  }, [profile])
+
+  useEffect(() => {
+    void refreshUpgradeRequestBadge()
+  }, [refreshUpgradeRequestBadge, location.pathname])
+
+  useEffect(() => {
+    const handleRefresh = () => { void refreshUpgradeRequestBadge() }
+    window.addEventListener('upgrade-request-badge:refresh', handleRefresh)
+    return () => window.removeEventListener('upgrade-request-badge:refresh', handleRefresh)
+  }, [refreshUpgradeRequestBadge])
 
   if (!profile) return null
   const items = navForRole(profile.role)
@@ -67,7 +87,23 @@ export default function AppShell() {
                     )}
                   >
                     <item.icon className="h-4 w-4 shrink-0" aria-hidden />
-                    <span className="truncate">{item.label}</span>{item.to === '/questions' && openQuestions > 0 && <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-600 px-1 text-[10px] font-semibold text-white">{openQuestions > 99 ? '99+' : openQuestions}</span>}
+                    <span className="truncate">{item.label}</span>
+                    {item.to === '/questions' && openQuestions > 0 && (
+                      <span
+                        className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-600 px-1 text-[10px] font-semibold text-white"
+                        aria-label={`${openQuestions} open question${openQuestions === 1 ? '' : 's'}`}
+                      >
+                        {openQuestions > 99 ? '99+' : openQuestions}
+                      </span>
+                    )}
+                    {item.label === 'Upgrade requests' && openUpgradeRequests > 0 && (
+                      <span
+                        className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-600 px-1 text-[10px] font-semibold text-white"
+                        aria-label={`${openUpgradeRequests} unresolved upgrade request${openUpgradeRequests === 1 ? '' : 's'} requiring your role's attention`}
+                      >
+                        {openUpgradeRequests > 99 ? '99+' : openUpgradeRequests}
+                      </span>
+                    )}
                   </NavLink>
                 </li>
               ))}

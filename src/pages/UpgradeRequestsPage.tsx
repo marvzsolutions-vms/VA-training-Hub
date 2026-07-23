@@ -23,6 +23,10 @@ const TONE: Record<UpgradeStatus, 'neutral' | 'info' | 'warning' | 'success' | '
   approved: 'success', declined: 'danger', cancelled: 'neutral',
 }
 
+const refreshUpgradeRequestBadge = () => {
+  window.dispatchEvent(new Event('upgrade-request-badge:refresh'))
+}
+
 export default function UpgradeRequestsPage() {
   const { profile, role } = useAuth()
   const { notify } = useToast()
@@ -129,6 +133,7 @@ export default function UpgradeRequestsPage() {
       setCreating(false)
       setDraft({ student_id: '', level: '', spec: '', reason: '', is_paid: false, amount: '', proof_url: '' })
       state.reload()
+      refreshUpgradeRequestBadge()
     } catch (error) {
       notify(readableError(error), 'error')
     } finally {
@@ -214,6 +219,7 @@ export default function UpgradeRequestsPage() {
       notify(`Request ${UPGRADE_STATUS_LABEL[to].toLowerCase()}.`)
       setNote('')
       state.reload(); trail.reload()
+      refreshUpgradeRequestBadge()
     } catch (error) {
       notify(readableError(error), 'error')
     } finally {

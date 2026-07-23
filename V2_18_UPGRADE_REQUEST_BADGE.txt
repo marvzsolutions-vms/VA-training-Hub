@@ -1,0 +1,61 @@
+VA Success Academy — V2.18 Upgrade Request Badge Patch
+======================================================
+
+REPLACEMENT FILES
+1. src/components/layout/AppShell.tsx
+2. src/pages/UpgradeRequestsPage.tsx
+3. supabase/migrations/0012_upgrade_request_badge.sql
+
+SUPABASE
+Run this migration in Supabase SQL Editor after 0011:
+  supabase/migrations/0012_upgrade_request_badge.sql
+
+COPY LOCATIONS
+Copy each replacement file into the matching path in the full project and allow
+it to replace the existing file. Do not delete other files or migrations.
+
+LOCAL COMMANDS
+  npm install
+  npm run dev
+  npm run build
+
+ROLE TESTING
+Owner
+- Sign in as Owner.
+- Badge counts every submitted, under_review, more_information_required, and
+  recommended request.
+- Approved, declined, and cancelled requests are excluded.
+
+Manager
+- Sign in as Manager.
+- Badge counts requests at the manager stage: under_review,
+  more_information_required, and recommended.
+- Submitted requests awaiting coach review are not counted.
+
+Coach
+- Sign in as Coach.
+- Badge counts only submitted, under_review, and more_information_required
+  requests for students visible to that coach under the existing coach/student
+  access rules.
+- Recommended requests are no longer counted because coach action is complete.
+
+Student
+- Sign in as Student.
+- No badge appears beside My level.
+
+REFRESH TEST
+- Keep the sidebar visible and submit or change a request status.
+- The count refreshes after submission and after recommendation, approval,
+  decline, or return-for-information actions.
+- Route changes and signed-in profile loading also refresh the count.
+- Counts over 99 display as 99+; zero hides the badge.
+
+
+BUILD VERIFICATION
+- npm install was attempted in the packaging environment but dependency download
+  did not complete before the environment timeout.
+- npm run build was attempted. It did not pass because required packages such as
+  react, react-router-dom, lucide-react, and @types/node were unavailable in the
+  incomplete node_modules installation.
+- No successful-build claim is made for this patch. Run npm install and npm run
+  build in the full local project before pushing to GitHub/Cloudflare Pages.
