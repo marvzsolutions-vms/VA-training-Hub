@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 112 112" role="img" aria-label="student neutral avatar">
+<rect width="112" height="112" rx="24" fill="#EEF3FF"/>
+<circle cx="84" cy="25" r="8" fill="#6D28D9"/><path d="M80 25h8M84 21v8" stroke="white" stroke-width="2" stroke-linecap="round"/>
+<path d="M28 44c1-18 11-29 27-29 16 0 27 11 28 29-7-7-16-10-27-10s-20 4-28 10z" fill="#5B3B2B"/><path d="M31 30c8-13 21-17 35-12 7 2 12 7 16 14-9-5-17-7-26-6-9 0-17 2-25 4z" fill="#5B3B2B"/>
+<ellipse cx="56" cy="52" rx="25" ry="29" fill="#F4B184" stroke="#2A1C2F" stroke-width="2"/>
+<path d="M37 44c4-3 9-4 13-1M62 43c5-3 10-2 14 1" stroke="#2A1C2F" stroke-width="2.4" stroke-linecap="round" fill="none"/>
+<ellipse cx="45" cy="51" rx="4.7" ry="6.2" fill="#2A1C2F"/><ellipse cx="68" cy="51" rx="4.7" ry="6.2" fill="#2A1C2F"/>
+<circle cx="43.5" cy="49" r="1.4" fill="white"/><circle cx="66.5" cy="49" r="1.4" fill="white"/>
+
+<path d="M51 65c3 3 8 3 11 0" fill="none" stroke="#A33A37" stroke-width="2.3" stroke-linecap="round"/>
+<circle cx="36" cy="61" r="4" fill="#EF9D95" opacity=".5"/><circle cx="76" cy="61" r="4" fill="#EF9D95" opacity=".5"/>
+<path d="M48 75v8h16v-8" fill="#F4B184"/>
+<path d="M41 84l15 7 15-7v22H41z" fill="#F8FAFC"/><path d="M48 86l8 6 8-6-8 15z" fill="#6D28D9"/>
+<path d="M34 106V89c4-8 11-12 22-12s18 4 22 12v17z" fill="#FFFFFF" stroke="#D8DEEA"/>
+</svg>
