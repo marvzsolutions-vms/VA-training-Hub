@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BookOpen, Plus, Presentation } from 'lucide-react'
+import { BookOpen, Plus, Presentation, Trash2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAsyncData } from '../../lib/useAsyncData'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
+import { ownerDeleteRecord, type OwnerDeleteTarget } from '../../lib/ownerDelete'
 import {
-  Badge, Button, Card, EmptyState, ErrorState, Input, Modal, PageHeader, SearchInput,
+  Badge, Button, Card, ConfirmDialog, EmptyState, ErrorState, Input, Modal, PageHeader, SearchInput,
   SectionHeading, Select, Spinner, Textarea,
 } from '../../components/ui'
 import { formatDuration, LESSON_TYPE_LABEL, LEVEL_SHORT, readableError } from '../../lib/utils'
@@ -31,6 +32,7 @@ export default function BuilderPage() {
   const [moduleForm, setModuleForm] = useState<typeof EMPTY_MODULE | null>(null)
   const [lessonForm, setLessonForm] = useState<(typeof EMPTY_LESSON & { moduleId: string }) | null>(null)
   const [saving, setSaving] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{type:OwnerDeleteTarget;id:string;label:string}|null>(null)
 
   const state = useAsyncData<{ courses: Course[]; specializations: Specialization[] }>(async () => {
     const [courses, specs] = await Promise.all([
@@ -146,6 +148,20 @@ export default function BuilderPage() {
     }
   }
 
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    setSaving(true)
+    try {
+      await ownerDeleteRecord(deleteTarget.type, deleteTarget.id)
+      notify(`${deleteTarget.label} deleted.`)
+      if (deleteTarget.type === 'course') setSelectedCourse(null)
+      setDeleteTarget(null)
+      await state.reload()
+      await structure.reload()
+    } catch (error) { notify(readableError(error), 'error') } finally { setSaving(false) }
+  }
+
   const togglePublished = async (course: Course) => {
     try {
       const { error } = await supabase.from('courses')
@@ -229,6 +245,7 @@ export default function BuilderPage() {
                       upgrade_required: active.upgrade_required,
                       learning_outcomes: active.learning_outcomes.join('\n'),
                     })}>Edit course</Button>
+                    <Button variant="danger" size="sm" onClick={()=>setDeleteTarget({type:'course',id:active.id,label:'Course'})}><Trash2 className="h-4 w-4"/>Delete</Button>
                     <Button size="sm" variant={active.is_published ? 'ghost' : 'primary'}
                       onClick={() => togglePublished(active)}>
                       {active.is_published ? 'Move to draft' : 'Publish'}
@@ -265,6 +282,7 @@ export default function BuilderPage() {
                             <Button size="sm" variant="ghost" onClick={() => setModuleForm({
                               id: module.id, title: module.title, description: module.description,
                             })}>Edit</Button>
+                            <Button size="sm" variant="danger" onClick={()=>setDeleteTarget({type:'module',id:module.id,label:'Module'})}><Trash2 className="h-4 w-4"/>Delete</Button>
                             <Button size="sm" variant="outline"
                               onClick={() => setLessonForm({ ...EMPTY_LESSON, moduleId: module.id })}>
                               <Plus className="h-4 w-4" aria-hidden />Lesson
@@ -285,6 +303,7 @@ export default function BuilderPage() {
                                 <Link to={`/builder/lessons/${lesson.id}`}>
                                   <Button size="sm" variant="ghost">Edit content</Button>
                                 </Link>
+                                <Button size="sm" variant="danger" onClick={()=>setDeleteTarget({type:'lesson',id:lesson.id,label:'Lesson'})}><Trash2 className="h-4 w-4"/>Delete</Button>
                                 <Link to={`/present/${lesson.id}`}>
                                   <Button size="sm" variant="outline">
                                     <Presentation className="h-4 w-4" aria-hidden />Present
@@ -305,6 +324,8 @@ export default function BuilderPage() {
       </div>
 
       {/* Course modal */}
+      <ConfirmDialog open={!!deleteTarget} onClose={()=>setDeleteTarget(null)} onConfirm={confirmDelete} loading={saving} tone="danger" confirmLabel="Delete permanently" title={`Delete ${deleteTarget?.label.toLowerCase() ?? 'record'}?`} message="This permanently deletes the selected item and related child records. This cannot be undone."/>
+
       <Modal
         open={!!courseForm} onClose={() => setCourseForm(null)} wide
         title={courseForm?.id ? 'Edit course' : 'Create a course'}

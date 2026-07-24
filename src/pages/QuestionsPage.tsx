@@ -1,14 +1,15 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Lock, MessageCircleQuestion, Plus, Send, Users } from 'lucide-react'
+import { Lock, MessageCircleQuestion, Plus, Send, Trash2, Users } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAsyncData } from '../lib/useAsyncData'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { isStaff } from '../lib/access'
+import { ownerDeleteRecord } from '../lib/ownerDelete'
 import {
   Badge, Button, Card, EmptyState, ErrorState, Input, Modal, PageHeader, SectionHeading,
-  Select, Spinner, Textarea,
+  ConfirmDialog, Select, Spinner, Textarea,
 } from '../components/ui'
 import { formatDateTime, QUESTION_STATUS_LABEL, readableError, relativeDays } from '../lib/utils'
 import type { Course, Lesson, Profile, Question, QuestionReply, QuestionStatus } from '../lib/types'
@@ -30,6 +31,8 @@ export default function QuestionsPage() {
   const [saving, setSaving] = useState(false)
   const [replyBody, setReplyBody] = useState('')
   const [internal, setInternal] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{type:'question'|'question_reply';id:string;label:string}|null>(null)
   const [draft, setDraft] = useState({
     course_id: params.get('course') ?? '', lesson_id: params.get('lesson') ?? '',
     subject: '', details: '', audience: 'coach_team' as Audience, assigned_to: '',
@@ -96,6 +99,20 @@ export default function QuestionsPage() {
     } catch (error) { notify(readableError(error), 'error') } finally { setSaving(false) }
   }
 
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await ownerDeleteRecord(deleteTarget.type, deleteTarget.id)
+      notify(`${deleteTarget.label} deleted.`)
+      if (deleteTarget.type === 'question') setSelected(null)
+      setDeleteTarget(null)
+      state.reload()
+      repliesState.reload()
+    } catch (error) { notify(readableError(error), 'error') } finally { setDeleting(false) }
+  }
+
   const changeStatus = async (status: QuestionStatus) => {
     if (!current) return
     const { error } = await supabase.from('questions').update({ status }).eq('id', current.id)
@@ -120,12 +137,13 @@ export default function QuestionsPage() {
         <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-ink-soft"><span>{q.audience==='general'?<Users className="inline h-3 w-3"/>:<Lock className="inline h-3 w-3"/>} {audienceLabel(q)}</span><span>·</span>{staff && q.student && q.audience!=='general' && <><span>{q.student.full_name}</span><span>·</span></>}<span>{q.courses?.title??'General'}</span><span>·</span><span>{relativeDays(q.created_at)}</span></div>
       </button>)}</div>
       <div>{!current?<EmptyState icon={MessageCircleQuestion} title="Select a question" description="Choose a question on the left to read the thread."/>:<Card>
-        <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="mb-2"><Badge tone={current.audience==='general'?'info':'neutral'}>{audienceLabel(current)}</Badge></div><h2 className="text-lg font-semibold text-ink">{current.subject}</h2><p className="mt-1 text-xs text-ink-soft">{current.courses?.title??'General'}{current.lessons?` · ${current.lessons.title}`:''} · {formatDateTime(current.created_at)}</p>{staff && current.audience==='private_coach' && <p className="mt-1 text-xs text-ink-muted">Assigned to {current.assigned_coach?.full_name??'selected coach'}</p>}</div>{staff&&<Select value={current.status} aria-label="Question status" onChange={e=>changeStatus(e.target.value as QuestionStatus)} className="w-44">{(Object.keys(QUESTION_STATUS_LABEL) as QuestionStatus[]).map(s=><option key={s} value={s}>{QUESTION_STATUS_LABEL[s]}</option>)}</Select>}</div>
+        <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="mb-2"><Badge tone={current.audience==='general'?'info':'neutral'}>{audienceLabel(current)}</Badge></div><h2 className="text-lg font-semibold text-ink">{current.subject}</h2><p className="mt-1 text-xs text-ink-soft">{current.courses?.title??'General'}{current.lessons?` · ${current.lessons.title}`:''} · {formatDateTime(current.created_at)}</p>{staff && current.audience==='private_coach' && <p className="mt-1 text-xs text-ink-muted">Assigned to {current.assigned_coach?.full_name??'selected coach'}</p>}</div><div className="flex items-center gap-2">{role==='owner'&&<Button variant="danger" size="sm" onClick={()=>setDeleteTarget({type:'question',id:current.id,label:'Question'})}><Trash2 className="h-4 w-4"/>Delete</Button>}{staff&&<Select value={current.status} aria-label="Question status" onChange={e=>changeStatus(e.target.value as QuestionStatus)} className="w-44">{(Object.keys(QUESTION_STATUS_LABEL) as QuestionStatus[]).map(s=><option key={s} value={s}>{QUESTION_STATUS_LABEL[s]}</option>)}</Select>}</div></div>
         <p className="prose-lesson mt-4 rounded-xl bg-canvas px-4 py-3">{current.details}</p>
-        <div className="mt-6"><SectionHeading title="Replies"/>{repliesState.loading?<Spinner label="Loading replies"/>:(repliesState.data??[]).length===0?<p className="text-sm text-ink-muted">No replies yet.</p>:<ul className="space-y-3">{(repliesState.data??[]).map(r=><li key={r.id} className={`rounded-xl border px-4 py-3 ${r.is_internal?'border-amber-200 bg-amber-50':'border-canvas-line bg-white'}`}><div className="flex items-center justify-between gap-2"><p className="text-sm font-medium text-ink">{r.author?.full_name??'Coach'}</p>{r.is_internal&&<Badge tone="warning">Internal note</Badge>}</div><p className="prose-lesson mt-1.5">{r.body}</p><p className="mt-1.5 text-[11px] text-ink-soft">{formatDateTime(r.created_at)}</p></li>)}</ul>}</div>
+        <div className="mt-6"><SectionHeading title="Replies"/>{repliesState.loading?<Spinner label="Loading replies"/>:(repliesState.data??[]).length===0?<p className="text-sm text-ink-muted">No replies yet.</p>:<ul className="space-y-3">{(repliesState.data??[]).map(r=><li key={r.id} className={`rounded-xl border px-4 py-3 ${r.is_internal?'border-amber-200 bg-amber-50':'border-canvas-line bg-white'}`}><div className="flex items-center justify-between gap-2"><p className="text-sm font-medium text-ink">{r.author?.full_name??'Coach'}</p>{r.is_internal&&<Badge tone="warning">Internal note</Badge>}</div><p className="prose-lesson mt-1.5">{r.body}</p><div className="mt-1.5 flex items-center justify-between gap-2"><p className="text-[11px] text-ink-soft">{formatDateTime(r.created_at)}</p>{role==='owner'&&<Button variant="ghost" size="sm" aria-label="Delete reply" onClick={()=>setDeleteTarget({type:'question_reply',id:r.id,label:'Reply'})}><Trash2 className="h-3.5 w-3.5"/>Delete</Button>}</div></li>)}</ul>}</div>
         {current.status!=='closed'&&<div className="mt-5 border-t border-canvas-line pt-4"><Textarea label={staff?'Write a reply':'Add to this thread'} value={replyBody} onChange={e=>setReplyBody(e.target.value)}/><div className="mt-3 flex flex-wrap items-center justify-between gap-3">{staff&&<label className="flex items-center gap-2 text-sm text-ink-muted"><input type="checkbox" checked={internal} onChange={e=>setInternal(e.target.checked)}/>Internal note — students never see this</label>}<Button onClick={sendReply} loading={saving} disabled={!replyBody.trim()}><Send className="h-4 w-4"/>Post reply</Button></div></div>}
       </Card>}</div>
     </div>}
+    <ConfirmDialog open={!!deleteTarget} onClose={()=>setDeleteTarget(null)} onConfirm={confirmDelete} loading={deleting} tone="danger" confirmLabel="Delete permanently" title={`Delete ${deleteTarget?.label.toLowerCase() ?? 'record'}?`} message={deleteTarget?.type==='question'?'This permanently deletes the question and every reply in its thread. This cannot be undone.':'This permanently deletes the selected reply. This cannot be undone.'}/>
     <Modal open={asking} onClose={()=>setAsking(false)} wide title="Ask a question" description="Choose who may see it. General questions are displayed anonymously to other students." footer={<><Button variant="outline" onClick={()=>setAsking(false)}>Cancel</Button><Button onClick={submitQuestion} loading={saving} disabled={!draft.subject.trim()||!draft.details.trim()}>Send question</Button></>}>
       <div className="space-y-4"><Select label="Who can see this question?" value={draft.audience} onChange={e=>setDraft({...draft,audience:e.target.value as Audience,assigned_to:''})}><option value="general">General Q&A — all students can learn from it, your name is hidden</option><option value="coach_team">Private — coaching team only</option><option value="private_coach">Private — one coach only</option></Select>{draft.audience==='private_coach'&&<div><p className="mb-2 text-sm font-medium text-ink">Choose coach</p><div className="grid gap-2 sm:grid-cols-2">{state.data!.coaches.length===0?<p className="rounded-xl border border-canvas-line p-3 text-sm text-ink-muted">No active coaches are available. Ask an owner or manager to activate a coach account.</p>:state.data!.coaches.map(c=>{const coachName=c.full_name?.trim()||c.email?.split('@')[0]||'Coach';const chosen=draft.assigned_to===c.id;return <button key={c.id} type="button" onClick={()=>setDraft({...draft,assigned_to:c.id})} className={`flex items-center gap-3 rounded-xl border p-3 text-left transition ${chosen?'border-brand-500 bg-brand-50 ring-2 ring-brand-200':'border-canvas-line hover:border-brand-300'}`}><img src={c.avatar_url||'/avatars/coach-neutral.svg'} alt="" className="h-10 w-10 rounded-xl object-cover"/><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-ink">{coachName}</span><span className="block truncate text-xs text-ink-muted">{c.email}</span></span><span className={`flex h-5 w-5 items-center justify-center rounded-full border text-xs ${chosen?'border-brand-600 bg-brand-600 text-white':'border-canvas-line'}`}>{chosen?'✓':''}</span></button>})}</div></div>}<Select label="Course" value={draft.course_id} onChange={e=>setDraft({...draft,course_id:e.target.value,lesson_id:''})}><option value="">General question</option>{state.data!.courses.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}</Select><Select label="Lesson" value={draft.lesson_id} onChange={e=>setDraft({...draft,lesson_id:e.target.value})}><option value="">Not lesson-specific</option>{lessonsForCourse.map(l=><option key={l.id} value={l.id}>{l.title}</option>)}</Select><Input label="Subject" required value={draft.subject} onChange={e=>setDraft({...draft,subject:e.target.value})}/><Textarea label="Details" required value={draft.details} onChange={e=>setDraft({...draft,details:e.target.value})}/></div>
     </Modal>

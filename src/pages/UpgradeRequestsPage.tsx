@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react'
-import { ArrowUpCircle, CheckCircle2, LockKeyhole, Plus, Send, ThumbsUp, XCircle } from 'lucide-react'
+import { ArrowUpCircle, CheckCircle2, LockKeyhole, Plus, Send, ThumbsUp, Trash2, XCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { uploadAcademyMedia } from '../lib/media'
 import { useAsyncData } from '../lib/useAsyncData'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { isManagerUp, isStaff } from '../lib/access'
+import { ownerDeleteRecord } from '../lib/ownerDelete'
 import {
-  Badge, Button, Card, EmptyState, ErrorState, Modal, PageHeader, SectionHeading,
+  Badge, Button, Card, ConfirmDialog, EmptyState, ErrorState, Modal, PageHeader, SectionHeading,
   Input, Select, Spinner, Textarea,
 } from '../components/ui'
 import {
@@ -41,6 +42,7 @@ export default function UpgradeRequestsPage() {
   const [postingInternalNote, setPostingInternalNote] = useState(false)
   const [draft, setDraft] = useState({ student_id: '', level: '' as '' | LearningLevel, spec: '', reason: '', is_paid: false, amount: '', proof_url: '' })
   const [uploadingProof, setUploadingProof] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
   const state = useAsyncData<{
     requests: UpgradeRequest[]
@@ -103,6 +105,14 @@ export default function UpgradeRequestsPage() {
 
   const current = rows.find((r) => r.id === selected)
     ?? (state.data?.requests ?? []).find((r) => r.id === selected) ?? null
+
+
+  const deleteCurrent = async () => {
+    if (!current) return
+    setSaving(true)
+    try { await ownerDeleteRecord('upgrade_request', current.id); notify('Upgrade request deleted.'); setSelected(null); setDeleteOpen(false); state.reload(); refreshUpgradeRequestBadge() }
+    catch (error) { notify(readableError(error), 'error') } finally { setSaving(false) }
+  }
 
   const logAction = async (requestId: string, action: string,
                           from: UpgradeStatus, to: UpgradeStatus, notes: string) => {
@@ -339,7 +349,7 @@ export default function UpgradeRequestsPage() {
                       raised {formatDateTime(current.created_at)}
                     </p>
                   </div>
-                  <Badge tone={TONE[current.status]}>{UPGRADE_STATUS_LABEL[current.status]}</Badge>
+                  <div className="flex items-center gap-2">{role==='owner'&&<Button variant="danger" size="sm" onClick={()=>setDeleteOpen(true)}><Trash2 className="h-4 w-4"/>Delete</Button>}<Badge tone={TONE[current.status]}>{UPGRADE_STATUS_LABEL[current.status]}</Badge></div>
                 </div>
 
                 {current.reason && (
@@ -501,6 +511,7 @@ export default function UpgradeRequestsPage() {
         </div>
       )}
 
+      <ConfirmDialog open={deleteOpen} onClose={()=>setDeleteOpen(false)} onConfirm={deleteCurrent} loading={saving} tone="danger" confirmLabel="Delete permanently" title="Delete upgrade request?" message="This permanently deletes the request, internal notes, and decision history. This cannot be undone."/>
       <Modal
         open={creating} onClose={() => setCreating(false)} wide
         title="Request an upgrade"

@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { ExternalLink, FolderOpen, Pencil, Plus, Save } from 'lucide-react'
+import { ExternalLink, FolderOpen, Pencil, Plus, Save, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAsyncData } from '../lib/useAsyncData'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { isStaff } from '../lib/access'
-import { Button, Card, ErrorState, Input, Modal, PageHeader, Spinner, Textarea } from '../components/ui'
+import { ownerDeleteRecord } from '../lib/ownerDelete'
+import { Button, Card, ConfirmDialog, ErrorState, Input, Modal, PageHeader, Spinner, Textarea } from '../components/ui'
 import { readableError } from '../lib/utils'
 
 interface ResourceSlot {
@@ -34,6 +35,7 @@ export default function ResourcesPage() {
   const staff = isStaff(role)
   const [editing, setEditing] = useState<ResourceSlot | null>(null)
   const [saving, setSaving] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<ResourceSlot | null>(null)
 
   const state = useAsyncData<ResourceSlot[]>(async () => {
     const { data, error } = await supabase.from('resource_slots')
@@ -75,6 +77,14 @@ export default function ResourcesPage() {
     }
   }
 
+
+  const remove = async () => {
+    if (!deleteTarget) return
+    setSaving(true)
+    try { await ownerDeleteRecord('resource', String(deleteTarget.id)); notify('Resource deleted.'); setDeleteTarget(null); setEditing(null); state.reload() }
+    catch (error) { notify(readableError(error), 'error') } finally { setSaving(false) }
+  }
+
   if (state.loading) return <Spinner label="Loading resources" />
   if (state.error) return <ErrorState message={state.error} onRetry={state.reload} />
 
@@ -103,9 +113,9 @@ export default function ResourcesPage() {
                   <FolderOpen className="h-5 w-5" aria-hidden />
                 </div>
                 {staff && (
-                  <Button variant="ghost" size="sm" onClick={() => setEditing({ ...slot })}>
+                  <div className="flex gap-1">{role==='owner'&&slot.id>0&&<Button variant="danger" size="sm" aria-label={`Delete resource ${slot.slot_number}`} onClick={()=>setDeleteTarget(slot)}><Trash2 className="h-3.5 w-3.5"/></Button>}<Button variant="ghost" size="sm" onClick={() => setEditing({ ...slot })}>
                     <Pencil className="h-3.5 w-3.5" aria-hidden />Edit
-                  </Button>
+                  </Button></div>
                 )}
               </div>
 
@@ -142,6 +152,7 @@ export default function ResourcesPage() {
         })}
       </div>
 
+      <ConfirmDialog open={!!deleteTarget} onClose={()=>setDeleteTarget(null)} onConfirm={remove} loading={saving} tone="danger" confirmLabel="Delete permanently" title="Delete resource?" message="This permanently removes the resource link. This cannot be undone."/>
       <Modal
         open={!!editing}
         onClose={() => setEditing(null)}

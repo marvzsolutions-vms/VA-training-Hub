@@ -1,0 +1,45 @@
+VA Success Academy V2.19 — Owner Delete Permissions
+
+COPY THESE FILES INTO THE MATCHING LOCATIONS OF THE FULL PROJECT:
+- src/pages/QuestionsPage.tsx
+- src/pages/UpgradeRequestsPage.tsx
+- src/pages/AnnouncementsPage.tsx
+- src/pages/ResourcesPage.tsx
+- src/pages/staff/BuilderPage.tsx
+- src/lib/ownerDelete.ts
+- supabase/migrations/0013_owner_delete_permissions.sql
+
+SUPABASE:
+Run 0013_owner_delete_permissions.sql in Supabase SQL Editor after migration 0012.
+The migration creates security-definer RPCs that determine the signed-in user using auth.uid().
+Only an active Owner can delete supported academy records. Students, Coaches, and Managers receive a permission error.
+
+COVERAGE IN THIS PATCH:
+- Questions and individual replies
+- Upgrade requests, including dependent notes/history through existing foreign keys
+- Announcements
+- Resource-library items
+- Courses, modules, and lessons from Course Builder
+- Secure account archive RPC for future student/staff archive UI (owner_archive_profile)
+
+SAFETY:
+- Destructive actions use confirmation dialogs.
+- Course/module/lesson deletion cascades according to existing database foreign keys.
+- Student and staff accounts are not hard-deleted. The migration provides owner_archive_profile() to deactivate safely.
+
+TEST:
+1. Sign in as Owner: delete buttons should appear in the supported pages.
+2. Delete a test question: its replies should disappear too.
+3. Delete a test course/module/lesson only after creating disposable test content.
+4. Sign in as Manager, Coach, and Student: delete buttons should not appear.
+5. Attempt the RPC as a non-owner: Supabase should reject it.
+
+COMMANDS:
+npm install
+npm run dev
+npm run build
+
+BUILD STATUS IN THE PATCH ENVIRONMENT:
+- npm install was attempted but timed out before dependency installation completed.
+- npm run build was attempted and failed because required type packages were unavailable after the incomplete installation (including React, Node, Babel, and D3 type definitions).
+- Therefore this patch does NOT claim a successful production build.

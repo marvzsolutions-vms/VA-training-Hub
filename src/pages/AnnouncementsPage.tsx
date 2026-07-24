@@ -1,12 +1,13 @@
 import { useState } from 'react'
-import { Megaphone, Plus, Image as ImageIcon } from 'lucide-react'
+import { Megaphone, Plus, Image as ImageIcon, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { uploadAcademyMedia } from '../lib/media'
 import { useAsyncData } from '../lib/useAsyncData'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { isStaff } from '../lib/access'
-import { Badge, Button, Card, EmptyState, ErrorState, Input, Modal, PageHeader, Select, Spinner, Textarea } from '../components/ui'
+import { ownerDeleteRecord } from '../lib/ownerDelete'
+import { Badge, Button, Card, ConfirmDialog, EmptyState, ErrorState, Input, Modal, PageHeader, Select, Spinner, Textarea } from '../components/ui'
 import { formatDate, readableError } from '../lib/utils'
 import type { Announcement, AnnouncementAudience, Batch, Course } from '../lib/types'
 
@@ -14,13 +15,15 @@ const EMPTY = { title:'', summary:'', message:'', banner_url:'', audience:'globa
 export default function AnnouncementsPage(){
  const {profile,role}=useAuth(); const {notify}=useToast(); const staff=isStaff(role)
  const [creating,setCreating]=useState(false),[saving,setSaving]=useState(false),[uploading,setUploading]=useState(false)
- const [selected,setSelected]=useState<Announcement|null>(null); const [draft,setDraft]=useState({...EMPTY})
+ const [selected,setSelected]=useState<Announcement|null>(null); const [draft,setDraft]=useState({...EMPTY}); const [deleting,setDeleting]=useState(false)
  const state=useAsyncData<{announcements:Announcement[];courses:Course[];batches:Batch[]}>(async()=>{
   const [a,c,b]=await Promise.all([supabase.from('announcements').select('*').order('publish_at',{ascending:false}),supabase.from('courses').select('id,title,slug,level').order('sort_order'),supabase.from('batches').select('id,code,name').eq('is_active',true).order('code')]); if(a.error) throw a.error
   return {announcements:(a.data??[]) as Announcement[],courses:(c.data??[]) as Course[],batches:(b.data??[]) as Batch[]}
  },[profile?.id])
  const upload=async(file?:File)=>{if(!file)return;setUploading(true);try{setDraft({...draft,banner_url:await uploadAcademyMedia(file,'announcements')});notify('Banner uploaded.')}catch(e){notify(readableError(e),'error')}finally{setUploading(false)}}
  const publish=async()=>{setSaving(true);try{const {error}=await supabase.from('announcements').insert({title:draft.title.trim(),summary:draft.summary.trim(),message:draft.message.trim(),banner_url:draft.banner_url||null,audience:draft.audience,course_id:draft.audience==='course'?draft.course_id||null:null,batch_id:draft.audience==='batch'?draft.batch_id||null:null,author_id:profile?.id??null,expires_at:draft.expires_at?new Date(draft.expires_at).toISOString():null});if(error)throw error;notify('Announcement published.');setCreating(false);setDraft({...EMPTY});state.reload()}catch(e){notify(readableError(e),'error')}finally{setSaving(false)}}
+
+ const remove=async()=>{if(!selected)return;setDeleting(true);try{await ownerDeleteRecord('announcement',selected.id);notify('Announcement deleted.');setSelected(null);state.reload()}catch(e){notify(readableError(e),'error')}finally{setDeleting(false)}}
  const retire=async(id:string)=>{const {error}=await supabase.from('announcements').update({is_active:false}).eq('id',id);if(error)notify(readableError(error),'error');else{notify('Announcement retired.');state.reload()}}
  if(state.loading)return <Spinner label="Loading announcements"/>; if(state.error)return <ErrorState message={state.error} onRetry={state.reload}/>
  const rows=state.data!.announcements
