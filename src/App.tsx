@@ -12,6 +12,7 @@ import DashboardPage from './pages/DashboardPage'
 import CoursesPage from './pages/CoursesPage'
 import CourseDetailPage from './pages/CourseDetailPage'
 import LessonPage from './pages/LessonPage'
+import QuizPage from './pages/QuizPage'
 import PresentationPage from './pages/PresentationPage'
 import CoursePresentationPage from './pages/CoursePresentationPage'
 import ToolsPage from './pages/ToolsPage'
@@ -86,6 +87,7 @@ export default function App() {
         <Route path="courses" element={<CoursesPage />} />
         <Route path="courses/:slug" element={<CourseDetailPage />} />
         <Route path="lessons/:lessonId" element={<LessonPage />} />
+        <Route path="quizzes/:quizId" element={<QuizPage />} />
         <Route path="tools" element={<ToolsPage />} />
         <Route path="resources" element={<ResourcesPage />} />
         <Route path="questions" element={<QuestionsPage />} />

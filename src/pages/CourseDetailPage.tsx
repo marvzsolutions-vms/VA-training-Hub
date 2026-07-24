@@ -22,6 +22,7 @@ interface CourseBundle {
   tools: Tool[]
   resources: ResourceItem[]
   prerequisiteCourses: Course[]
+  quizzes: Array<{ id: string; title: string; description: string; passing_percentage: number; required_for_completion: boolean }>
 }
 
 export default function CourseDetailPage() {
@@ -36,7 +37,7 @@ export default function CourseDetailPage() {
     if (error) throw error
     if (!course) throw new Error('That course does not exist or is not available to your account.')
 
-    const [modules, lessons, progress, courseTools, resources, prereqs] = await Promise.all([
+    const [modules, lessons, progress, courseTools, resources, prereqs, quizzes] = await Promise.all([
       supabase.from('modules').select('*').eq('course_id', course.id).order('sort_order'),
       supabase.from('lessons').select('*').eq('course_id', course.id).order('sort_order'),
       profile
@@ -46,6 +47,7 @@ export default function CourseDetailPage() {
       supabase.from('resources').select('*, resource_types(id, name, slug, icon)')
         .eq('course_id', course.id).eq('is_archived', false).order('sort_order'),
       supabase.from('course_prerequisites').select('prerequisite_id').eq('course_id', course.id),
+      supabase.from('quizzes').select('id,title,description,passing_percentage,required_for_completion').eq('course_id', course.id).eq('is_published', true).order('sort_order'),
     ])
 
     const prereqIds = (prereqs.data ?? []).map((p: { prerequisite_id: string }) => p.prerequisite_id)
@@ -62,13 +64,14 @@ export default function CourseDetailPage() {
         .map((row) => row.tools).filter(Boolean) as Tool[],
       resources: (resources.data ?? []) as ResourceItem[],
       prerequisiteCourses: prerequisiteCourses as Course[],
+      quizzes: (quizzes.data ?? []) as CourseBundle['quizzes'],
     }
   }, [slug, profile?.id])
 
   if (state.loading || accessState.loading) return <Spinner label="Loading course" />
   if (state.error) return <ErrorState message={state.error} onRetry={state.reload} />
 
-  const { course, modules, lessons, progress, tools, resources, prerequisiteCourses } = state.data!
+  const { course, modules, lessons, progress, tools, resources, prerequisiteCourses, quizzes } = state.data!
   const ctx = accessState.data!
   const access = evaluateCourseAccess(course, ctx)
   const enrollment = ctx.enrollments.find((e) => e.course_id === course.id)
@@ -137,6 +140,26 @@ export default function CourseDetailPage() {
 
           <SectionHeading title="Course content"
             description={`${modules.length} modules · ${lessons.length} lessons · ${formatDuration(course.estimated_minutes)}`} />
+
+          {access.allowed && quizzes.length > 0 && (
+            <div className="mb-6">
+              <SectionHeading title="Graded assessments" description="Pass required quizzes to complete this course." />
+              <div className="space-y-3">
+                {quizzes.map((quiz) => (
+                  <Card key={quiz.id} className="flex items-center justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-ink">{quiz.title}</h3>
+                        {quiz.required_for_completion && <Badge tone="warning">Required</Badge>}
+                      </div>
+                      <p className="mt-1 text-sm text-ink-muted">{quiz.description || `Passing score: ${quiz.passing_percentage}%`}</p>
+                    </div>
+                    <Link to={`/quizzes/${quiz.id}`}><Button size="sm">Start quiz</Button></Link>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
 
           {modules.length === 0 ? (
             <EmptyState icon={BookOpen} title="No modules yet"
