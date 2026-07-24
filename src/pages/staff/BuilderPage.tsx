@@ -1,17 +1,17 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BookOpen, Plus, Presentation, Trash2 } from 'lucide-react'
+import { BookOpen, Plus, Presentation, Upload } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAsyncData } from '../../lib/useAsyncData'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
-import { ownerDeleteRecord, type OwnerDeleteTarget } from '../../lib/ownerDelete'
 import {
-  Badge, Button, Card, ConfirmDialog, EmptyState, ErrorState, Input, Modal, PageHeader, SearchInput,
+  Badge, Button, Card, EmptyState, ErrorState, Input, Modal, PageHeader, SearchInput,
   SectionHeading, Select, Spinner, Textarea,
 } from '../../components/ui'
 import { formatDuration, LESSON_TYPE_LABEL, LEVEL_SHORT, readableError } from '../../lib/utils'
 import type { Course, LearningLevel, Lesson, LessonType, Module, Specialization } from '../../lib/types'
+import { parseCourseImportZip, type CourseImportPreview } from '../../lib/courseImport'
 
 const EMPTY_COURSE = {
   id: '', title: '', slug: '', description: '', level: 'level_1' as LearningLevel,
@@ -32,7 +32,10 @@ export default function BuilderPage() {
   const [moduleForm, setModuleForm] = useState<typeof EMPTY_MODULE | null>(null)
   const [lessonForm, setLessonForm] = useState<(typeof EMPTY_LESSON & { moduleId: string }) | null>(null)
   const [saving, setSaving] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState<{type:OwnerDeleteTarget;id:string;label:string}|null>(null)
+  const [importOpen, setImportOpen] = useState(false)
+  const [importPreview, setImportPreview] = useState<CourseImportPreview | null>(null)
+  const [importing, setImporting] = useState(false)
+  const [importError, setImportError] = useState('')
 
   const state = useAsyncData<{ courses: Course[]; specializations: Specialization[] }>(async () => {
     const [courses, specs] = await Promise.all([
@@ -149,17 +152,34 @@ export default function BuilderPage() {
   }
 
 
-  const confirmDelete = async () => {
-    if (!deleteTarget) return
-    setSaving(true)
+  const chooseImportFile = async (file: File | null) => {
+    setImportPreview(null)
+    setImportError('')
+    if (!file) return
     try {
-      await ownerDeleteRecord(deleteTarget.type, deleteTarget.id)
-      notify(`${deleteTarget.label} deleted.`)
-      if (deleteTarget.type === 'course') setSelectedCourse(null)
-      setDeleteTarget(null)
+      setImportPreview(await parseCourseImportZip(file))
+    } catch (error) {
+      setImportError(readableError(error))
+    }
+  }
+
+  const importCourse = async () => {
+    if (!importPreview) return
+    setImporting(true)
+    try {
+      const { data, error } = await supabase.rpc('import_course_package', { payload: importPreview })
+      if (error) throw error
+      const result = data as { course_id?: string } | null
+      notify(`Imported ${importPreview.title}.`)
+      setImportOpen(false)
+      setImportPreview(null)
       await state.reload()
-      await structure.reload()
-    } catch (error) { notify(readableError(error), 'error') } finally { setSaving(false) }
+      if (result?.course_id) setSelectedCourse(result.course_id)
+    } catch (error) {
+      notify(readableError(error), 'error')
+    } finally {
+      setImporting(false)
+    }
   }
 
   const togglePublished = async (course: Course) => {
@@ -186,9 +206,16 @@ export default function BuilderPage() {
       <PageHeader
         title="Course builder"
         description="Create courses, add modules and lessons, then write the lesson content."
-        action={<Button onClick={() => setCourseForm({ ...EMPTY_COURSE })}>
-          <Plus className="h-4 w-4" aria-hidden />New course
-        </Button>}
+        action={<>
+          {profile?.role === 'owner' && (
+            <Button variant="outline" onClick={() => { setImportOpen(true); setImportPreview(null); setImportError('') }}>
+              <Upload className="h-4 w-4" aria-hidden />Import ZIP
+            </Button>
+          )}
+          <Button onClick={() => setCourseForm({ ...EMPTY_COURSE })}>
+            <Plus className="h-4 w-4" aria-hidden />New course
+          </Button>
+        </>}
       />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,340px)_1fr]">
@@ -245,7 +272,6 @@ export default function BuilderPage() {
                       upgrade_required: active.upgrade_required,
                       learning_outcomes: active.learning_outcomes.join('\n'),
                     })}>Edit course</Button>
-                    <Button variant="danger" size="sm" onClick={()=>setDeleteTarget({type:'course',id:active.id,label:'Course'})}><Trash2 className="h-4 w-4"/>Delete</Button>
                     <Button size="sm" variant={active.is_published ? 'ghost' : 'primary'}
                       onClick={() => togglePublished(active)}>
                       {active.is_published ? 'Move to draft' : 'Publish'}
@@ -282,7 +308,6 @@ export default function BuilderPage() {
                             <Button size="sm" variant="ghost" onClick={() => setModuleForm({
                               id: module.id, title: module.title, description: module.description,
                             })}>Edit</Button>
-                            <Button size="sm" variant="danger" onClick={()=>setDeleteTarget({type:'module',id:module.id,label:'Module'})}><Trash2 className="h-4 w-4"/>Delete</Button>
                             <Button size="sm" variant="outline"
                               onClick={() => setLessonForm({ ...EMPTY_LESSON, moduleId: module.id })}>
                               <Plus className="h-4 w-4" aria-hidden />Lesson
@@ -303,7 +328,6 @@ export default function BuilderPage() {
                                 <Link to={`/builder/lessons/${lesson.id}`}>
                                   <Button size="sm" variant="ghost">Edit content</Button>
                                 </Link>
-                                <Button size="sm" variant="danger" onClick={()=>setDeleteTarget({type:'lesson',id:lesson.id,label:'Lesson'})}><Trash2 className="h-4 w-4"/>Delete</Button>
                                 <Link to={`/present/${lesson.id}`}>
                                   <Button size="sm" variant="outline">
                                     <Presentation className="h-4 w-4" aria-hidden />Present
@@ -323,9 +347,44 @@ export default function BuilderPage() {
         </div>
       </div>
 
-      {/* Course modal */}
-      <ConfirmDialog open={!!deleteTarget} onClose={()=>setDeleteTarget(null)} onConfirm={confirmDelete} loading={saving} tone="danger" confirmLabel="Delete permanently" title={`Delete ${deleteTarget?.label.toLowerCase() ?? 'record'}?`} message="This permanently deletes the selected item and related child records. This cannot be undone."/>
+      <Modal
+        open={importOpen}
+        onClose={() => { if (!importing) setImportOpen(false) }}
+        title="Import course ZIP"
+        description="Owner-only import for structured VA Success Academy course packages."
+        wide
+        footer={<>
+          <Button variant="outline" onClick={() => setImportOpen(false)} disabled={importing}>Cancel</Button>
+          <Button onClick={importCourse} loading={importing} disabled={!importPreview}>Import course</Button>
+        </>}
+      >
+        <div className="space-y-4">
+          <label className="block cursor-pointer rounded-xl border border-dashed border-brand-200 bg-brand-50/40 p-5 text-center">
+            <Upload className="mx-auto h-6 w-6 text-brand-600" aria-hidden />
+            <span className="mt-2 block text-sm font-semibold text-ink">Choose a course package ZIP</span>
+            <span className="mt-1 block text-xs text-ink-muted">Requires course.json, modules.json, lessons.json, and referenced lesson files.</span>
+            <input className="sr-only" type="file" accept=".zip,application/zip" onChange={(event) => chooseImportFile(event.target.files?.[0] ?? null)} />
+          </label>
+          {importError && <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{importError}</div>}
+          {importPreview && (
+            <Card>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div><p className="text-xs font-semibold uppercase tracking-wide text-brand-700">Ready to import</p><h3 className="mt-1 text-base font-semibold text-ink">{importPreview.title}</h3><p className="mt-1 text-sm text-ink-muted">{importPreview.sourceFileName}</p></div>
+                <Badge tone={importPreview.published ? 'success' : 'warning'}>{importPreview.published ? 'Published' : 'Draft'}</Badge>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div><p className="text-xs text-ink-muted">Modules</p><p className="font-semibold text-ink">{importPreview.modules.length}</p></div>
+                <div><p className="text-xs text-ink-muted">Lessons</p><p className="font-semibold text-ink">{importPreview.lessons.length}</p></div>
+                <div><p className="text-xs text-ink-muted">Resources</p><p className="font-semibold text-ink">{importPreview.resources.length}</p></div>
+                <div><p className="text-xs text-ink-muted">Assessments</p><p className="font-semibold text-ink">{importPreview.quizzes.length + importPreview.assignments.length}</p></div>
+              </div>
+              <p className="mt-4 text-xs text-ink-muted">A matching course slug is never overwritten. The import stops with an error instead.</p>
+            </Card>
+          )}
+        </div>
+      </Modal>
 
+      {/* Course modal */}
       <Modal
         open={!!courseForm} onClose={() => setCourseForm(null)} wide
         title={courseForm?.id ? 'Edit course' : 'Create a course'}
